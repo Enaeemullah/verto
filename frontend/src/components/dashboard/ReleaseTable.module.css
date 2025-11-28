@@ -7,9 +7,33 @@
   background: var(--crm-black);
   color: #fff;
   padding: 0.9rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cardTitle {
   text-transform: uppercase;
   font-size: 0.85rem;
   letter-spacing: 1px;
+}
+
+.shareButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.shareButton:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 table {

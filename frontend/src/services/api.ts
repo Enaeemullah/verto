@@ -10,6 +10,14 @@ interface AuthResponse {
   };
 }
 
+export interface InviteDetails {
+  email: string;
+  projectName: string;
+  client: string;
+  inviterEmail: string;
+  expiresAt: string;
+}
+
 const parseJson = async (response: Response) => {
   const text = await response.text();
   if (!text) {
@@ -105,3 +113,33 @@ export const upsertRelease = (token: string, client: string, environment: string
 
 export const deleteRelease = (token: string, client: string, environment: string) =>
   request<ReleasesData>(`/releases/${encodeURIComponent(client)}/${encodeURIComponent(environment)}`, { method: 'DELETE' }, token);
+
+export const sendProjectInvite = (token: string, client: string, email: string) =>
+  request<void>(
+    `/projects/${encodeURIComponent(client)}/invitations`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    },
+    token
+  );
+
+export const fetchInviteDetails = (token: string) =>
+  request<InviteDetails>(`/auth/invitations/${encodeURIComponent(token)}`, { method: 'GET' });
+
+export const acceptInviteRequest = (tokenValue: string, password?: string) => {
+  const payload: Record<string, string> = { token: tokenValue };
+
+  if (password) {
+    payload.password = password;
+  }
+
+  return request<AuthResponse>(
+    '/auth/invitations/accept',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    undefined
+  );
+};

@@ -5,6 +5,7 @@ import { downloadJson } from '../utils/download';
 import {
   deleteRelease as deleteReleaseRequest,
   fetchReleases,
+  sendProjectInvite,
   upsertRelease as upsertReleaseRequest,
 } from '../services/api';
 
@@ -14,6 +15,7 @@ interface ReleasesContextValue {
   updateRelease: (client: string, env: string, release: Release) => Promise<void>;
   deleteRelease: (client: string, env: string) => Promise<void>;
   exportData: () => void;
+  inviteUser: (client: string, email: string) => Promise<void>;
 }
 
 const ReleasesContext = createContext<ReleasesContextValue | undefined>(undefined);
@@ -99,6 +101,14 @@ export const ReleasesProvider = ({ children }: ReleasesProviderProps) => {
     [ensureToken]
   );
 
+  const inviteUser = useCallback(
+    (client: string, email: string) => {
+      const authToken = ensureToken();
+      return sendProjectInvite(authToken, client, email);
+    },
+    [ensureToken]
+  );
+
   const exportData = useCallback(() => {
     if (!currentUser) {
       return;
@@ -114,8 +124,9 @@ export const ReleasesProvider = ({ children }: ReleasesProviderProps) => {
       updateRelease,
       deleteRelease,
       exportData,
+      inviteUser,
     }),
-    [addRelease, deleteRelease, exportData, releases, updateRelease]
+    [addRelease, deleteRelease, exportData, inviteUser, releases, updateRelease]
   );
 
   return <ReleasesContext.Provider value={value}>{children}</ReleasesContext.Provider>;

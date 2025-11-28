@@ -1,5 +1,6 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { Release } from '../releases/release.entity';
+import { Project } from '../projects/project.entity';
+import { ProjectMember } from '../projects/project-member.entity';
 
 @Entity('users')
 export class User {
@@ -12,6 +13,9 @@ export class User {
   @Column()
   passwordHash: string;
 
-  @OneToMany(() => Release, (release) => release.user)
-  releases: Release[];
+  @OneToMany(() => Project, (project) => project.owner)
+  ownedProjects: Project[];
+
+  @OneToMany(() => ProjectMember, (member) => member.user)
+  projectMemberships: ProjectMember[];
 }

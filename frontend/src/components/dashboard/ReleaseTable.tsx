@@ -1,17 +1,24 @@
 import styles from './ReleaseTable.module.css';
 import { ReleaseRow } from '../../types/releases';
-import { DeleteIcon, EditIcon } from '../common/icons';
+import { DeleteIcon, EditIcon, ShareIcon } from '../common/icons';
 
 interface ReleaseTableProps {
   client: string;
   rows: ReleaseRow[];
   onEdit: (row: ReleaseRow) => void;
   onDelete: (row: ReleaseRow) => void;
+  onInvite: (client: string) => void;
 }
 
-export const ReleaseTable = ({ client, rows, onEdit, onDelete }: ReleaseTableProps) => (
+export const ReleaseTable = ({ client, rows, onEdit, onDelete, onInvite }: ReleaseTableProps) => (
   <div className={styles.card}>
-    <div className={styles.cardHeader}>{client}</div>
+    <div className={styles.cardHeader}>
+      <span className={styles.cardTitle}>{client}</span>
+      <button className={styles.shareButton} onClick={() => onInvite(client)} aria-label={`Invite collaborators for ${client}`}>
+        <ShareIcon />
+        Share
+      </button>
+    </div>
     <table>
       <thead>
         <tr>

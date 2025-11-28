@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -8,12 +9,15 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
+import { AcceptInviteDto } from './dto/accept-invite.dto';
+import { ProjectInvitesService } from '../projects/project-invites.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly projectInvitesService: ProjectInvitesService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -44,6 +48,27 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    return this.buildAuthResponse(user.id, user.email);
+  }
+
+  previewInvite(token: string) {
+    return this.projectInvitesService.getInviteDetails(token);
+  }
+
+  async acceptInvite(dto: AcceptInviteDto) {
+    const invite = await this.projectInvitesService.getInviteDetails(dto.token);
+    let user = await this.usersService.findByEmail(invite.email);
+
+    if (!user) {
+      if (!dto.password) {
+        throw new BadRequestException('Password is required to create your account');
+      }
+
+      const passwordHash = await bcrypt.hash(dto.password, 10);
+      user = await this.usersService.create(invite.email, passwordHash);
+    }
+
+    await this.projectInvitesService.consumeInvite(dto.token, user.id);
     return this.buildAuthResponse(user.id, user.email);
   }
 
