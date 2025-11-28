@@ -8,15 +8,17 @@ import { Modal } from '../common/Modal';
 import { ReleaseForm } from './ReleaseForm';
 import { ReleaseTable } from './ReleaseTable';
 import { SearchBar } from './SearchBar';
+import { InviteUserForm } from './InviteUserForm';
 import { DownloadIcon, LogoutIcon, PlusIcon } from '../common/icons';
 
 export const Dashboard = () => {
-  const { releases, addRelease, updateRelease, deleteRelease, exportData } = useReleases();
+  const { releases, addRelease, updateRelease, deleteRelease, exportData, inviteUser } = useReleases();
   const { currentUser, logout } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ReleaseRow | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<string | null>(null);
 
   const rows = useMemo(() => sortReleases(flattenReleases(releases)), [releases]);
   const filteredRows = useMemo(() => filterReleases(rows, searchTerm), [rows, searchTerm]);
@@ -60,6 +62,13 @@ export const Dashboard = () => {
       }
     },
     [deleteRelease]
+  );
+
+  const handleInvite = useCallback(
+    async (client: string, email: string) => {
+      await inviteUser(client, email);
+    },
+    [inviteUser]
   );
 
   const activeEditData = editTarget
@@ -111,6 +120,7 @@ export const Dashboard = () => {
               rows={clientRows}
               onEdit={(row) => setEditTarget(row)}
               onDelete={(row) => handleDelete(row.client, row.env)}
+              onInvite={(targetClient) => setInviteTarget(targetClient)}
             />
           ))}
         </div>
@@ -127,6 +137,20 @@ export const Dashboard = () => {
       <Modal title="Edit release" isOpen={Boolean(editTarget)} onClose={() => setEditTarget(null)}>
         {activeEditData && (
           <ReleaseForm initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
+        )}
+      </Modal>
+
+      <Modal
+        title={inviteTarget ? `Invite collaborators for ${inviteTarget}` : 'Invite collaborators'}
+        isOpen={Boolean(inviteTarget)}
+        onClose={() => setInviteTarget(null)}
+      >
+        {inviteTarget && (
+          <InviteUserForm
+            client={inviteTarget}
+            onSubmit={(email) => handleInvite(inviteTarget, email)}
+            onCancel={() => setInviteTarget(null)}
+          />
         )}
       </Modal>
     </section>

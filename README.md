@@ -19,7 +19,7 @@ A full-stack release tracker built with React + Vite on the frontend and NestJS 
 2. Configure environment variables
 
    ```bash
-   cp backend/.env.example backend/.env   # update DB credentials + secrets
+   cp backend/.env.example backend/.env   # update DB credentials + secrets + SMTP settings for invites
    ```
 
    Ensure a MySQL database (default `client_release_manager`) exists and the configured user has permissions.
@@ -64,6 +64,7 @@ frontend/src/
 
 - Email + password auth persisted in MySQL and secured with JWTs
 - Add/edit/delete release metadata per client/environment with server-side validation
+- Invite collaborators to specific client projects via emailed signup links
 - Search across clients, branches, versions, and environments
 - JSON export of the current user's release catalog
 - Responsive layout with accessible modals and form semantics

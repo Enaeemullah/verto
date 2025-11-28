@@ -1,6 +1,12 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { clearSession, getStoredSession, saveSession } from '../services/userStorage';
-import { loginRequest, signupRequest } from '../services/api';
+import {
+  acceptInviteRequest,
+  fetchInviteDetails,
+  loginRequest,
+  signupRequest,
+  type InviteDetails,
+} from '../services/api';
 
 interface AuthContextValue {
   currentUser: string | null;
@@ -8,6 +14,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  loadInvite: (token: string) => Promise<InviteDetails>;
+  acceptInvite: (token: string, password?: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -73,6 +81,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     clearSession();
   }, []);
 
+  const loadInvite = useCallback((inviteToken: string) => fetchInviteDetails(inviteToken), []);
+
+  const acceptInvite = useCallback(
+    async (inviteToken: string, password?: string) => {
+      try {
+        const response = await acceptInviteRequest(inviteToken, password);
+        persistSession(response.token, response.user.email);
+        return true;
+      } catch (error) {
+        console.error(error);
+        throw error;
+      }
+    },
+    [persistSession]
+  );
+
   const value = useMemo(
     () => ({
       currentUser,
@@ -80,8 +104,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       login,
       signup,
       logout,
+      loadInvite,
+      acceptInvite,
     }),
-    [currentUser, login, signup, logout, token]
+    [acceptInvite, currentUser, loadInvite, login, logout, signup, token]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

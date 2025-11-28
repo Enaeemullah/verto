@@ -5,10 +5,10 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from '../users/user.entity';
+import { Project } from '../projects/project.entity';
 
 @Entity('releases')
-@Index(['userId', 'client', 'environment'], { unique: true })
+@Index(['projectId', 'environment'], { unique: true })
 export class Release {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -31,11 +31,11 @@ export class Release {
   @Column({ type: 'date' })
   date: string;
 
-  @ManyToOne(() => User, (user) => user.releases, {
+  @ManyToOne(() => Project, (project) => project.releases, {
     onDelete: 'CASCADE',
   })
-  user: User;
+  project: Project;
 
   @Column()
-  userId: string;
+  projectId: string;
 }
