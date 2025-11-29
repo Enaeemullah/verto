@@ -8,6 +8,20 @@ interface ProjectInviteTemplate {
   inviterEmail: string;
 }
 
+interface ReleaseUpdateTemplate {
+  projectName: string;
+  projectSlug: string;
+  environment: string;
+  version: string;
+  branch: string;
+  build: number;
+  date: string;
+  commitMessage: string | null;
+  actorName: string;
+  actorEmail: string;
+  isNewRelease: boolean;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -36,6 +50,31 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         'Failed to send invite email',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  async sendReleaseUpdateNotification(recipient: string, template: ReleaseUpdateTemplate) {
+    if (!this.transporter) {
+      this.logger.warn(
+        `Email transport not configured. Release update for ${recipient} in ${template.projectSlug}`,
+      );
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.configService.get<string>('EMAIL_FROM'),
+        to: recipient,
+        subject: this.buildReleaseSubject(template),
+        text: this.buildReleasePlainText(template),
+        html: this.buildReleaseHtml(template),
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to send release update email',
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
@@ -106,6 +145,59 @@ If you did not expect this email, you can safely ignore it.
 
       <p style="font-size: 12px; color: #999;">
         This email was sent automatically. If you did not expect it, you can ignore it.
+      </p>
+  </div>
+`;
+  }
+
+  private buildReleaseSubject(template: ReleaseUpdateTemplate) {
+    const action = template.isNewRelease ? 'created' : 'updated';
+    return `${template.projectName}: ${template.environment} release ${action}`;
+  }
+
+  private buildReleasePlainText(template: ReleaseUpdateTemplate) {
+    const action = template.isNewRelease ? 'created' : 'updated';
+    const lines = [
+      `${template.actorName} (${template.actorEmail}) ${action} a release for ${template.projectName}.`,
+      '',
+      `Environment: ${template.environment}`,
+      `Version: ${template.version}`,
+      `Branch: ${template.branch}`,
+      `Build: ${template.build}`,
+      `Date: ${template.date}`,
+    ];
+
+    if (template.commitMessage) {
+      lines.push(`Commit message: ${template.commitMessage}`);
+    }
+
+    lines.push('', 'You are receiving this because you collaborate on this project.');
+    return lines.join('\n');
+  }
+
+  private buildReleaseHtml(template: ReleaseUpdateTemplate) {
+    const action = template.isNewRelease ? 'created' : 'updated';
+    const commitMessageSection = template.commitMessage
+      ? `<p style="font-size: 14px; color: #444;"><strong>Commit message:</strong> ${template.commitMessage}</p>`
+      : '';
+
+    return `
+  <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="font-weight: 600; font-size: 20px; margin-bottom: 10px;">
+        ${template.projectName} &mdash; ${template.environment} release ${action}
+      </h2>
+      <p style="font-size: 15px; color: #444;">
+        ${template.actorName} (${template.actorEmail}) ${action} a release for this project.
+      </p>
+      <div style="font-size: 14px; line-height: 1.6; color: #333; background: #f5f5ff; padding: 16px; border-radius: 8px;">
+        <p style="margin: 0;"><strong>Version:</strong> ${template.version}</p>
+        <p style="margin: 0;"><strong>Branch:</strong> ${template.branch}</p>
+        <p style="margin: 0;"><strong>Build:</strong> ${template.build}</p>
+        <p style="margin: 0;"><strong>Date:</strong> ${template.date}</p>
+      </div>
+      ${commitMessageSection}
+      <p style="font-size: 12px; color: #777; margin-top: 20px;">
+        You are receiving this because you collaborate on ${template.projectName}.
       </p>
   </div>
 `;
