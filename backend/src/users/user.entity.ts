@@ -13,8 +13,14 @@ export class User {
   @Column()
   passwordHash: string;
 
- @Column({ type: 'varchar', length: 120, nullable: true })
-displayName: string | null;
+  @Column({ nullable: true, length: 120 })
+  firstName: string | null;
+
+  @Column({ nullable: true, length: 120 })
+  lastName: string | null;
+
+  @Column({ nullable: true, length: 120 })
+  displayName: string | null;
 
   @Column({ type: 'longtext', nullable: true })
   avatarUrl: string | null;
