@@ -239,6 +239,37 @@ export class ProjectsService {
     return this.buildActivitySummary(fullProject, logs);
   }
 
+  async getProjectCollaborators(projectId: string): Promise<User[]> {
+    const [project, members] = await Promise.all([
+      this.projectsRepository.findOne({
+        where: { id: projectId },
+        relations: { owner: true },
+      }),
+      this.membersRepository.find({
+        where: { projectId },
+        relations: { user: true },
+      }),
+    ]);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const collaborators = new Map<string, User>();
+
+    members.forEach((member) => {
+      if (member.user) {
+        collaborators.set(member.user.id, member.user);
+      }
+    });
+
+    if (project.owner) {
+      collaborators.set(project.owner.id, project.owner);
+    }
+
+    return Array.from(collaborators.values());
+  }
+
   private buildActivitySummary(project: Project, logs: ProjectActivityLog[]): ProjectActivitySummaryDto {
     return {
       projectId: project.id,

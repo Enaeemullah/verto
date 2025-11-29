@@ -6,6 +6,9 @@ import { Release } from './release.entity';
 import { UpsertReleaseDto } from './dto/upsert-release.dto';
 import { ReleasePayload, ReleasesResponse } from './releases.types';
 import { ProjectsService } from '../projects/projects.service';
+import { EmailService } from '../email/email.service';
+import { UsersService } from '../users/users.service';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class ReleasesService {
@@ -13,6 +16,8 @@ export class ReleasesService {
     @InjectRepository(Release)
     private readonly releasesRepository: Repository<Release>,
     private readonly projectsService: ProjectsService,
+    private readonly emailService: EmailService,
+    private readonly usersService: UsersService,
   ) {}
 
   async getReleasesForUser(userId: string): Promise<ReleasesResponse> {
@@ -52,6 +57,8 @@ export class ReleasesService {
       where: { projectId: project.id, environment },
     });
 
+    const isNewRelease = !release;
+
     if (!release) {
       release = this.releasesRepository.create({
         projectId: project.id,
@@ -83,6 +90,12 @@ export class ReleasesService {
       build: release.build,
       date: release.date,
       commitMessage: release.commitMessage,
+    });
+    await this.notifyCollaboratorsOfReleaseUpdate({
+      project,
+      release,
+      actorId: userId,
+      isNewRelease,
     });
     return this.getReleasesForUser(userId);
   }
@@ -141,5 +154,73 @@ export class ReleasesService {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private async notifyCollaboratorsOfReleaseUpdate(options: {
+    project: { id: string; name: string; slug: string };
+    release: Release;
+    actorId: string;
+    isNewRelease: boolean;
+  }) {
+    const collaborators = await this.projectsService.getProjectCollaborators(options.project.id);
+
+    if (!collaborators.length) {
+      return;
+    }
+
+    const recipients = collaborators.filter((user) => user.id !== options.actorId);
+
+    if (!recipients.length) {
+      return;
+    }
+
+    const actor =
+      collaborators.find((user) => user.id === options.actorId) ??
+      (await this.usersService.findById(options.actorId));
+
+    const actorName = this.buildUserDisplayName(actor);
+    const actorEmail = actor?.email ?? 'unknown';
+    const releaseDate =
+      options.release.date instanceof Date
+        ? options.release.date.toISOString().split('T')[0]
+        : options.release.date;
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        this.emailService.sendReleaseUpdateNotification(recipient.email, {
+          projectName: options.project.name,
+          projectSlug: options.project.slug,
+          environment: options.release.environment,
+          version: options.release.version,
+          branch: options.release.branch,
+          build: options.release.build,
+          date: releaseDate,
+          commitMessage: options.release.commitMessage ?? null,
+          actorName,
+          actorEmail,
+          isNewRelease: options.isNewRelease,
+        }),
+      ),
+    );
+  }
+
+  private buildUserDisplayName(user: User | null | undefined) {
+    if (!user) {
+      return 'A collaborator';
+    }
+
+    if (user.displayName) {
+      return user.displayName;
+    }
+
+    const nameParts = [user.firstName, user.lastName].filter((part): part is string =>
+      Boolean(part && part.trim()),
+    );
+
+    if (nameParts.length) {
+      return nameParts.join(' ');
+    }
+
+    return user.email;
   }
 }
