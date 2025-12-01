@@ -9,6 +9,7 @@ import { ReleasesModule } from './releases/releases.module';
 import { ProjectsModule } from './projects/projects.module';
 import { resolve } from 'node:path';
 import { TransactionEventsModule } from './transaction-events/transaction-events.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 const envFilePath = (() => {
   const env = process.env.NODE_ENV ?? 'development';
@@ -45,6 +46,7 @@ const envFilePath = (() => {
     AuthModule,
     ReleasesModule,
     ProjectsModule,
+    OrganizationsModule,
     TransactionEventsModule,
   ],
   controllers: [AppController],
