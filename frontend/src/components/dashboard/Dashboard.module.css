@@ -36,10 +36,34 @@
   max-width: 520px;
 }
 
+.viewTabs {
+  display: inline-flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.viewTabButton {
+  border-radius: 999px;
+  border: 1px solid var(--verto-border);
+  background: #fff;
+  color: var(--verto-text);
+  padding: 0.4rem 1.25rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.viewTabButton--active {
+  background: #e8e8e8;
+  color: black;
+  border-color: var(--verto-black);
+}
+
 .badge {
   display: inline-flex;
   padding: 0.25rem 0.65rem;
-  border: 1px solid var(--verto-border);
+  border: black;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -179,7 +203,23 @@
 
 .activityError {
   margin: 0;
-  color: #c0392b;
+  color: var(--verto-black);
+  background: var(--verto-highlight);
+  padding: 0.75rem 1rem;
+}
+
+.transactionDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.transactionDetails p {
+  margin: 0;
+}
+
+.transactionDetails strong {
+  font-weight: 600;
 }
 
 @media (max-width: 768px) {
@@ -206,4 +246,7 @@
     justify-content: center;
   }
 
+  .viewTabs {
+    width: 100%;
+  }
 }

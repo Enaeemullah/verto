@@ -2,7 +2,12 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { Project } from './project.entity';
 import { User } from '../users/user.entity';
 
-export type ProjectActivityAction = 'project_created' | 'release_upserted' | 'release_deleted';
+export type ProjectActivityAction =
+  | 'project_created'
+  | 'release_upserted'
+  | 'release_deleted'
+  | 'transaction_event_created'
+  | 'transaction_event_updated';
 
 @Entity('project_activity_logs')
 export class ProjectActivityLog {
