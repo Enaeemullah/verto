@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { TransactionEvent } from './transaction-event.entity';
@@ -55,7 +55,11 @@ export class TransactionEventsService {
       throw new ConflictException('Transaction event already exists');
     }
 
-    const project = await this.projectsService.ensureProjectForUser(userId, normalizedClient);
+    const project = await this.projectsService.findAccessibleProjectBySlug(userId, normalizedClient);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
 
     const event = this.transactionEventsRepository.create({
       projectId: project.id,
