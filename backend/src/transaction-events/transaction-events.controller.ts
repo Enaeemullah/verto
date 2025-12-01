@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/comm
 import { TransactionEventsService } from './transaction-events.service';
 import { JwtAuthGuard } from '../security/jwt-auth.guard';
 import { CurrentUser } from '../security/user.decorator';
-import { JwtPayload } from '../security/jwt-payload.interface';
+import type { JwtPayload } from '../security/jwt-payload.interface';
 import { CreateTransactionEventDto } from './dto/create-transaction-event.dto';
 import { UpdateTransactionEventDto } from './dto/update-transaction-event.dto';
 

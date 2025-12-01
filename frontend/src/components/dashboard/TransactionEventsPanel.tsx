@@ -44,7 +44,7 @@ export const TransactionEventsPanel = ({ eventsByClient, onAddClick, onView, onE
               <div className={styles.cardHeader}>
                 <div>
                   <p className={styles.cardKicker}>Project</p>
-                  <h3 className={styles.cardTitle}>{displayName}</h3>
+                  <h3 className={styles.cardTitle}>{displayName?.toUpperCase()}</h3>
                   {displayName !== client && <p className={styles.cardSubtitle}>{client}</p>}
                 </div>
                 <span className={styles.cardCount}>{clientEvents.length} events</span>

@@ -86,7 +86,7 @@ export const TransactionEventForm = ({
 
       <div>
         <label className={styles.label} htmlFor="transaction-code">
-          Transaction code
+          Transaction Event
         </label>
         <input id="transaction-code" type="text" value={code} onChange={(event) => setCode(event.target.value)} placeholder="TRX-001" />
       </div>

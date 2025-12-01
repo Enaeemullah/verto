@@ -55,15 +55,15 @@
 }
 
 .viewTabButton--active {
-  background: var(--verto-highlight);
-  color: var(--verto-black);
+  background: #e8e8e8;
+  color: black;
   border-color: var(--verto-black);
 }
 
 .badge {
   display: inline-flex;
   padding: 0.25rem 0.65rem;
-  border: 1px solid var(--verto-border);
+  border: black;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
