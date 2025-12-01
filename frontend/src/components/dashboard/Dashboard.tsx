@@ -40,7 +40,7 @@ const buildTransactionEventScript = (event: TransactionEvent) => {
   const columns = 'pet_eventcode, pet_eventdesc, system_generated';
   const petEventCode = escapeSqlLiteral(event.petEventCode);
   const petEventDesc = escapeSqlLiteral(event.petEventDesc);
-  const systemGenerated = 'N';
+  const systemGenerated = '0';
 
   return SCRIPT_TARGETS.map(
     ({ schema, table }) =>
@@ -662,7 +662,7 @@ export const Dashboard = () => {
               <code>{scriptPreview}</code>
             </pre>
             <p className={styles.scriptHint}>
-              The `system_generated` flag defaults to &apos;N&apos;. Update it before running the script if your process requires a
+              The `system_generated` flag defaults to &apos;0&apos;. Update it before running the script if your process requires a
               different value.
             </p>
             <div className={styles.scriptActions}>
