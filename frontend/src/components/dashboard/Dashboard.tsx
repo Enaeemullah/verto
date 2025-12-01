@@ -14,6 +14,9 @@ import { UserSettingsModal } from './UserSettingsModal';
 import { PendingProjectInvite, ProjectActivitySummary } from '../../types/projects';
 import { ProjectActivityList } from './ProjectActivityList';
 import { PendingInvitesPanel } from './PendingInvitesPanel';
+import { useTransactions } from '../../contexts/TransactionsContext';
+import { TransactionEventsPanel } from './TransactionEventsPanel';
+import { TransactionEventForm } from './TransactionEventForm';
 import {
   acceptPendingInviteRequest,
   fetchPendingInvites,
@@ -49,6 +52,8 @@ export const Dashboard = () => {
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState<string | null>(null);
   const [inviteAction, setInviteAction] = useState<{ id: string; action: 'accept' | 'reject' } | null>(null);
+  const [activeView, setActiveView] = useState<'releases' | 'transactions'>('releases');
+  const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const loadPendingInvites = useCallback(async () => {
     if (!token) {
       setPendingInvites([]);
@@ -120,6 +125,7 @@ export const Dashboard = () => {
   const rows = useMemo(() => sortReleases(flattenReleases(releases)), [releases]);
   const filteredRows = useMemo(() => filterReleases(rows, searchTerm), [rows, searchTerm]);
   const groupedRows = useMemo(() => Array.from(groupByClient(filteredRows).entries()), [filteredRows]);
+  const { events: transactionEvents, addEvent: addTransactionEvent } = useTransactions();
 
   const handleAdd = useCallback(
     async (client: string, env: string, release: Release) => {
@@ -166,6 +172,19 @@ export const Dashboard = () => {
       await inviteUser(client, email);
     },
     [inviteUser]
+  );
+
+  const handleAddTransactionEvent = useCallback(
+    async (client: string, code: string, description: string) => {
+      try {
+        await addTransactionEvent(client, code, description);
+        setTransactionModalOpen(false);
+      } catch (error) {
+        console.error(error);
+        window.alert(error instanceof Error ? error.message : 'Unable to add transaction event.');
+      }
+    },
+    [addTransactionEvent],
   );
 
   const handleViewActivity = useCallback(
@@ -298,47 +317,76 @@ export const Dashboard = () => {
           </div>
         </header>
 
-        <div className={styles.toolbar}>
-          <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search clients, branches, versions..." />
-          <div className={styles.actions}>
-            <button className="btn" onClick={() => exportData()}>
-              <DownloadIcon /> Export
-            </button>
-            <button className="btn btn--filled" onClick={() => setCreateModalOpen(true)}>
-              <PlusIcon /> Add Release
-            </button>
-          </div>
+        <div className={styles.viewTabs} role="tablist" aria-label="Workspace views">
+          <button
+            type="button"
+            className={`${styles.viewTabButton} ${activeView === 'releases' ? styles['viewTabButton--active'] : ''}`.trim()}
+            onClick={() => setActiveView('releases')}
+            role="tab"
+            aria-selected={activeView === 'releases'}
+          >
+            Release management
+          </button>
+          <button
+            type="button"
+            className={`${styles.viewTabButton} ${activeView === 'transactions' ? styles['viewTabButton--active'] : ''}`.trim()}
+            onClick={() => setActiveView('transactions')}
+            role="tab"
+            aria-selected={activeView === 'transactions'}
+          >
+            Transaction events
+          </button>
         </div>
 
-        <PendingInvitesPanel
-          invites={pendingInvites}
-          isLoading={invitesLoading}
-          error={invitesError}
-          onRefresh={() => {
-            void loadPendingInvites();
-          }}
-          onAccept={handleAcceptInvite}
-          onReject={handleRejectInvite}
-          actionState={inviteAction}
-        />
+        {activeView === 'releases' && (
+          <>
+            <div className={styles.toolbar}>
+              <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search clients, branches, versions..." />
+              <div className={styles.actions}>
+                <button className="btn" onClick={() => exportData()}>
+                  <DownloadIcon /> Export
+                </button>
+                <button className="btn btn--filled" onClick={() => setCreateModalOpen(true)}>
+                  <PlusIcon /> Add Release
+                </button>
+              </div>
+            </div>
 
-        <div className={styles.cardGrid}>
-          {groupedRows.map(([client, clientRows]) => (
-            <ReleaseTable
-              key={client}
-              client={client}
-              rows={clientRows}
-              onEdit={(row) => setEditTarget(row)}
-              onDelete={(row) => handleDelete(row.client, row.env)}
-              onInvite={(targetClient) => setInviteTarget(targetClient)}
-              activity={activity[client]}
-              onViewActivity={handleViewActivity}
+            <PendingInvitesPanel
+              invites={pendingInvites}
+              isLoading={invitesLoading}
+              error={invitesError}
+              onRefresh={() => {
+                void loadPendingInvites();
+              }}
+              onAccept={handleAcceptInvite}
+              onReject={handleRejectInvite}
+              actionState={inviteAction}
             />
-          ))}
-        </div>
 
-        {filteredRows.length === 0 && (
-          <div className={styles.emptyState}>No releases found. Add your first release to get started.</div>
+            <div className={styles.cardGrid}>
+              {groupedRows.map(([client, clientRows]) => (
+                <ReleaseTable
+                  key={client}
+                  client={client}
+                  rows={clientRows}
+                  onEdit={(row) => setEditTarget(row)}
+                  onDelete={(row) => handleDelete(row.client, row.env)}
+                  onInvite={(targetClient) => setInviteTarget(targetClient)}
+                  activity={activity[client]}
+                  onViewActivity={handleViewActivity}
+                />
+              ))}
+            </div>
+
+            {filteredRows.length === 0 && (
+              <div className={styles.emptyState}>No releases found. Add your first release to get started.</div>
+            )}
+          </>
+        )}
+
+        {activeView === 'transactions' && (
+          <TransactionEventsPanel eventsByClient={transactionEvents} onAddClick={() => setTransactionModalOpen(true)} />
         )}
       </div>
 
@@ -367,6 +415,10 @@ export const Dashboard = () => {
       </Modal>
 
       <UserSettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <Modal title="Add transaction event" isOpen={isTransactionModalOpen} onClose={() => setTransactionModalOpen(false)}>
+        <TransactionEventForm onSubmit={handleAddTransactionEvent} onCancel={() => setTransactionModalOpen(false)} />
+      </Modal>
 
       <Modal
         title={activityModalClient ? `Activity for ${activityModalClient}` : 'Project activity'}

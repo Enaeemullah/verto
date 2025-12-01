@@ -1,6 +1,7 @@
 import { Release, ReleasesData } from '../types/releases';
 import { UserProfile } from '../types/user';
 import { PendingProjectInvite, ProjectActivityMap, ProjectActivitySummary } from '../types/projects';
+import { TransactionEventsByClient } from '../types/transactions';
 
 const DEFAULT_API_URL = 'http://localhost:3000';
 const baseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? DEFAULT_API_URL;
@@ -120,6 +121,25 @@ export const upsertRelease = (token: string, client: string, environment: string
 
 export const deleteRelease = (token: string, client: string, environment: string) =>
   request<ReleasesData>(`/releases/${encodeURIComponent(client)}/${encodeURIComponent(environment)}`, { method: 'DELETE' }, token);
+
+export interface CreateTransactionEventPayload {
+  client: string;
+  code: string;
+  description: string;
+}
+
+export const fetchTransactionEvents = (token: string) =>
+  request<TransactionEventsByClient>('/transaction-events', { method: 'GET' }, token);
+
+export const createTransactionEventRequest = (token: string, payload: CreateTransactionEventPayload) =>
+  request<TransactionEventsByClient>(
+    '/transaction-events',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token
+  );
 
 export const sendProjectInvite = (token: string, client: string, email: string) =>
   request<void>(

@@ -1,9 +1,20 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 import { Release } from '../releases/release.entity';
 import { ProjectMember } from './project-member.entity';
 import { ProjectInvite } from './project-invite.entity';
 import { ProjectActivityLog } from './project-activity-log.entity';
+import { TransactionEvent } from '../transaction-events/transaction-event.entity';
 
 @Entity('projects')
 @Index(['ownerId', 'slug'], { unique: true })
@@ -36,6 +47,9 @@ export class Project {
 
   @OneToMany(() => ProjectActivityLog, (log) => log.project)
   activityLogs: ProjectActivityLog[];
+
+  @OneToMany(() => TransactionEvent, (transaction) => transaction.project)
+  transactionEvents: TransactionEvent[];
 
   @Column({ nullable: true })
   lastUpdatedById: string | null;

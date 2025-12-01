@@ -36,6 +36,30 @@
   max-width: 520px;
 }
 
+.viewTabs {
+  display: inline-flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.viewTabButton {
+  border-radius: 999px;
+  border: 1px solid var(--verto-border);
+  background: #fff;
+  color: var(--verto-text);
+  padding: 0.4rem 1.25rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.viewTabButton--active {
+  background: #1d3fbf;
+  color: #fff;
+  border-color: #1d3fbf;
+}
+
 .badge {
   display: inline-flex;
   padding: 0.25rem 0.65rem;
@@ -206,4 +230,7 @@
     justify-content: center;
   }
 
+  .viewTabs {
+    width: 100%;
+  }
 }
