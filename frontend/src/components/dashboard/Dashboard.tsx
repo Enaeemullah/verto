@@ -24,6 +24,9 @@ import {
   fetchPendingInvites,
   rejectPendingInviteRequest,
 } from '../../services/api';
+import { useOrganizations } from '../../contexts/OrganizationsContext';
+import { AddOrganizationForm } from './AddOrganizationForm';
+import { OrganizationList } from './OrganizationList';
 
 export const Dashboard = () => {
   const {
@@ -38,6 +41,7 @@ export const Dashboard = () => {
     reloadWorkspace,
   } = useReleases();
   const { currentUser, logout, token } = useAuth();
+  const { organizations, addOrganization, isLoading: isOrganizationsLoading } = useOrganizations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -54,10 +58,11 @@ export const Dashboard = () => {
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState<string | null>(null);
   const [inviteAction, setInviteAction] = useState<{ id: string; action: 'accept' | 'reject' } | null>(null);
-  const [activeView, setActiveView] = useState<'releases' | 'transactions'>('releases');
+  const [activeView, setActiveView] = useState<'releases' | 'organizations' | 'transactions'>('releases');
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [viewTransactionEvent, setViewTransactionEvent] = useState<TransactionEvent | null>(null);
   const [editTransactionEvent, setEditTransactionEvent] = useState<TransactionEvent | null>(null);
+  const [isOrganizationModalOpen, setOrganizationModalOpen] = useState(false);
   const toast = useToast();
   const loadPendingInvites = useCallback(async () => {
     if (!token) {
@@ -134,18 +139,37 @@ export const Dashboard = () => {
   const groupedRows = useMemo(() => Array.from(groupByClient(filteredRows).entries()), [filteredRows]);
   const { events: transactionEvents, addEvent: addTransactionEvent, updateEvent: updateTransactionEvent } = useTransactions();
   const projectOptions = useMemo<ProjectOption[]>(() => {
-    const slugs = new Set<string>();
-    Object.keys(releases).forEach((slug) => slugs.add(slug));
-    Object.keys(activity).forEach((slug) => slugs.add(slug));
-    Object.keys(transactionEvents).forEach((slug) => slugs.add(slug));
+    const labelMap = new Map<string, string>();
 
-    return Array.from(slugs)
-      .map((slug) => ({
+    organizations.forEach((org) => {
+      labelMap.set(org.code, org.name);
+    });
+
+    Object.keys(activity).forEach((slug) => {
+      if (!labelMap.has(slug)) {
+        labelMap.set(slug, activity[slug]?.name ?? slug);
+      }
+    });
+
+    Object.keys(releases).forEach((slug) => {
+      if (!labelMap.has(slug)) {
+        labelMap.set(slug, slug);
+      }
+    });
+
+    Object.keys(transactionEvents).forEach((slug) => {
+      if (!labelMap.has(slug)) {
+        labelMap.set(slug, slug);
+      }
+    });
+
+    return Array.from(labelMap.entries())
+      .map(([slug, label]) => ({
         slug,
-        label: activity[slug]?.name ?? slug,
+        label,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [releases, activity, transactionEvents]);
+  }, [organizations, releases, activity, transactionEvents]);
 
   const handleAdd = useCallback(
     async (client: string, env: string, release: Release) => {
@@ -197,10 +221,25 @@ export const Dashboard = () => {
     [inviteUser]
   );
 
-  const handleAddTransactionEvent = useCallback(
-    async ({ client, code, description }: TransactionEventFormValues) => {
+  const handleAddOrganization = useCallback(
+    async (values: { name: string; code: string }) => {
       try {
-        await addTransactionEvent(client, code, description);
+        await addOrganization(values);
+        await reloadWorkspace();
+        setOrganizationModalOpen(false);
+        toast.success('Organization added.');
+      } catch (error) {
+        console.error(error);
+        toast.error(error instanceof Error ? error.message : 'Unable to add organization.');
+      }
+    },
+    [addOrganization, reloadWorkspace, toast],
+  );
+
+  const handleAddTransactionEvent = useCallback(
+    async ({ client, petEventCode, petEventDesc }: TransactionEventFormValues) => {
+      try {
+        await addTransactionEvent(client, petEventCode, petEventDesc);
         setTransactionModalOpen(false);
         toast.success('Transaction event added.');
       } catch (error) {
@@ -211,14 +250,21 @@ export const Dashboard = () => {
     [addTransactionEvent, toast],
   );
 
+  const handleGenerateScript = useCallback(
+    (event: TransactionEvent) => {
+      toast.info(`Script generation for ${event.petEventCode} is coming soon.`);
+    },
+    [toast],
+  );
+
   const handleUpdateTransactionEvent = useCallback(
-    async ({ client, code, description }: TransactionEventFormValues) => {
+    async ({ client, petEventCode, petEventDesc }: TransactionEventFormValues) => {
       if (!editTransactionEvent) {
         return;
       }
 
       try {
-        await updateTransactionEvent(editTransactionEvent.id, { client, code, description });
+        await updateTransactionEvent(editTransactionEvent.id, { client, petEventCode, petEventDesc });
         setEditTransactionEvent(null);
         toast.success('Transaction event updated.');
       } catch (error) {
@@ -371,6 +417,15 @@ export const Dashboard = () => {
           </button>
           <button
             type="button"
+            className={`${styles.viewTabButton} ${activeView === 'organizations' ? styles['viewTabButton--active'] : ''}`.trim()}
+            onClick={() => setActiveView('organizations')}
+            role="tab"
+            aria-selected={activeView === 'organizations'}
+          >
+            Organizations
+          </button>
+          <button
+            type="button"
             className={`${styles.viewTabButton} ${activeView === 'transactions' ? styles['viewTabButton--active'] : ''}`.trim()}
             onClick={() => setActiveView('transactions')}
             role="tab"
@@ -387,6 +442,9 @@ export const Dashboard = () => {
               <div className={styles.actions}>
                 <button className="btn" onClick={() => exportData()}>
                   <DownloadIcon /> Export
+                </button>
+                <button className="btn" onClick={() => setOrganizationModalOpen(true)}>
+                  <PlusIcon /> Add organization
                 </button>
                 <button className="btn btn--filled" onClick={() => setCreateModalOpen(true)}>
                   <PlusIcon /> Add Release
@@ -427,12 +485,21 @@ export const Dashboard = () => {
           </>
         )}
 
+        {activeView === 'organizations' && (
+          <OrganizationList
+            organizations={organizations}
+            isLoading={isOrganizationsLoading}
+            onAddClick={() => setOrganizationModalOpen(true)}
+          />
+        )}
+
         {activeView === 'transactions' && (
           <TransactionEventsPanel
             eventsByClient={transactionEvents}
             onAddClick={() => setTransactionModalOpen(true)}
             onView={setViewTransactionEvent}
             onEdit={setEditTransactionEvent}
+            onGenerateScript={handleGenerateScript}
           />
         )}
       </div>
@@ -445,6 +512,10 @@ export const Dashboard = () => {
         {activeEditData && (
           <ReleaseForm initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
         )}
+      </Modal>
+
+      <Modal title="Add organization" isOpen={isOrganizationModalOpen} onClose={() => setOrganizationModalOpen(false)}>
+        <AddOrganizationForm onSubmit={handleAddOrganization} onCancel={() => setOrganizationModalOpen(false)} />
       </Modal>
 
       <Modal
@@ -472,7 +543,7 @@ export const Dashboard = () => {
       </Modal>
 
       <Modal
-        title={viewTransactionEvent ? `Transaction ${viewTransactionEvent.code}` : 'Transaction event'}
+        title={viewTransactionEvent ? `Transaction ${viewTransactionEvent.petEventCode}` : 'Transaction event'}
         isOpen={Boolean(viewTransactionEvent)}
         onClose={() => setViewTransactionEvent(null)}
       >
@@ -482,10 +553,10 @@ export const Dashboard = () => {
               <strong>Project:</strong> {viewTransactionEvent.projectName} ({viewTransactionEvent.client})
             </p>
             <p>
-              <strong>Code:</strong> {viewTransactionEvent.code}
+              <strong>Event Code:</strong> {viewTransactionEvent.petEventCode}
             </p>
             <p>
-              <strong>Description:</strong> {viewTransactionEvent.description}
+              <strong>Description:</strong> {viewTransactionEvent.petEventDesc}
             </p>
             <p>
               <strong>Created:</strong> {new Date(viewTransactionEvent.createdAt).toLocaleString()}
@@ -503,8 +574,8 @@ export const Dashboard = () => {
             projects={projectOptions}
             initialValues={{
               client: editTransactionEvent.client,
-              code: editTransactionEvent.code,
-              description: editTransactionEvent.description,
+              petEventCode: editTransactionEvent.petEventCode,
+              petEventDesc: editTransactionEvent.petEventDesc,
             }}
             submitLabel="Save changes"
             onSubmit={handleUpdateTransactionEvent}
