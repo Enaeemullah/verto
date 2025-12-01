@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Up
 import { Project } from '../projects/project.entity';
 import { ProjectMember } from '../projects/project-member.entity';
 import { ProjectActivityLog } from '../projects/project-activity-log.entity';
+import { Organization } from '../organizations/organization.entity';
 
 @Entity('users')
 export class User {
@@ -52,4 +53,7 @@ export class User {
 
   @OneToMany(() => ProjectActivityLog, (log) => log.user)
   projectActivityLogs: ProjectActivityLog[];
+
+  @OneToMany(() => Organization, (organization) => organization.owner)
+  organizations: Organization[];
 }

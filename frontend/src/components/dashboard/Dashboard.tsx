@@ -9,7 +9,7 @@ import { ReleaseForm } from './ReleaseForm';
 import { ReleaseTable } from './ReleaseTable';
 import { SearchBar } from './SearchBar';
 import { InviteUserForm } from './InviteUserForm';
-import { DownloadIcon, LogoutIcon, PlusIcon, SettingsIcon } from '../common/icons';
+import { ActivityIcon, BuildingIcon, DownloadIcon, LayersIcon, LogoutIcon, PlusIcon, SettingsIcon } from '../common/icons';
 import { UserSettingsModal } from './UserSettingsModal';
 import { PendingProjectInvite, ProjectActivitySummary } from '../../types/projects';
 import { ProjectActivityList } from './ProjectActivityList';
@@ -19,11 +19,16 @@ import { TransactionEventsPanel } from './TransactionEventsPanel';
 import { ProjectOption, TransactionEventForm, TransactionEventFormValues } from './TransactionEventForm';
 import { TransactionEvent } from '../../types/transactions';
 import { useToast } from '../../contexts/ToastContext';
+import { ClientForm, ClientFormValues } from './ClientForm';
+import { TransactionEventSelectorForm } from './TransactionEventSelectorForm';
+import { useOrganizations } from '../../contexts/OrganizationsContext';
 import {
   acceptPendingInviteRequest,
   fetchPendingInvites,
   rejectPendingInviteRequest,
 } from '../../services/api';
+
+type DashboardView = 'releases' | 'transactions' | 'clients';
 
 export const Dashboard = () => {
   const {
@@ -38,6 +43,7 @@ export const Dashboard = () => {
     reloadWorkspace,
   } = useReleases();
   const { currentUser, logout, token } = useAuth();
+  const { organizations, isLoading: organizationsLoading, error: organizationsError, createOrganization } = useOrganizations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -54,7 +60,7 @@ export const Dashboard = () => {
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState<string | null>(null);
   const [inviteAction, setInviteAction] = useState<{ id: string; action: 'accept' | 'reject' } | null>(null);
-  const [activeView, setActiveView] = useState<'releases' | 'transactions'>('releases');
+  const [activeView, setActiveView] = useState<DashboardView>('releases');
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [viewTransactionEvent, setViewTransactionEvent] = useState<TransactionEvent | null>(null);
   const [editTransactionEvent, setEditTransactionEvent] = useState<TransactionEvent | null>(null);
@@ -135,17 +141,58 @@ export const Dashboard = () => {
   const { events: transactionEvents, addEvent: addTransactionEvent, updateEvent: updateTransactionEvent } = useTransactions();
   const projectOptions = useMemo<ProjectOption[]>(() => {
     const slugs = new Set<string>();
-    Object.keys(releases).forEach((slug) => slugs.add(slug));
-    Object.keys(activity).forEach((slug) => slugs.add(slug));
-    Object.keys(transactionEvents).forEach((slug) => slugs.add(slug));
+    const labels = new Map<string, string>();
+
+    const registerSlug = (slug: string, label?: string) => {
+      if (!slug) {
+        return;
+      }
+
+      slugs.add(slug);
+      if (label) {
+        labels.set(slug, label);
+      }
+    };
+
+    organizations.forEach((org) => registerSlug(org.por_orgacode, org.por_orgadesc));
+    Object.keys(releases).forEach((slug) => registerSlug(slug));
+    Object.entries(activity).forEach(([slug, summary]) => registerSlug(slug, summary?.name ?? slug));
+    Object.entries(transactionEvents).forEach(([slug, events]) => {
+      const displayName = events[0]?.projectName ?? labels.get(slug) ?? slug;
+      registerSlug(slug, displayName);
+    });
 
     return Array.from(slugs)
       .map((slug) => ({
         slug,
-        label: activity[slug]?.name ?? slug,
+        label: labels.get(slug) ?? slug,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [releases, activity, transactionEvents]);
+  }, [organizations, releases, activity, transactionEvents]);
+
+  const viewMenuItems = useMemo(
+    () => [
+      {
+        id: 'releases' as const,
+        label: 'Release management',
+        description: 'Track deployment readiness for every client.',
+        icon: <LayersIcon />,
+      },
+      {
+        id: 'transactions' as const,
+        label: 'Transaction events',
+        description: 'Map transaction codes to their owning projects.',
+        icon: <ActivityIcon />,
+      },
+      {
+        id: 'clients' as const,
+        label: 'Client directory',
+        description: 'Capture organization metadata once.',
+        icon: <BuildingIcon />,
+      },
+    ],
+    []
+  );
 
   const handleAdd = useCallback(
     async (client: string, env: string, release: Release) => {
@@ -195,6 +242,24 @@ export const Dashboard = () => {
       await inviteUser(client, email);
     },
     [inviteUser]
+  );
+
+  const handleAddClient = useCallback(
+    async (values: ClientFormValues) => {
+      try {
+        await createOrganization({
+          por_orgadesc: values.por_orgadesc,
+          por_orgacode: values.por_orgacode,
+          por_active: values.por_active,
+        });
+        toast.success('Client saved.');
+      } catch (error) {
+        console.error(error);
+        toast.error(error instanceof Error ? error.message : 'Unable to save organization.');
+        throw error;
+      }
+    },
+    [createOrganization, toast],
   );
 
   const handleAddTransactionEvent = useCallback(
@@ -359,26 +424,23 @@ export const Dashboard = () => {
           </div>
         </header>
 
-        <div className={styles.viewTabs} role="tablist" aria-label="Workspace views">
-          <button
-            type="button"
-            className={`${styles.viewTabButton} ${activeView === 'releases' ? styles['viewTabButton--active'] : ''}`.trim()}
-            onClick={() => setActiveView('releases')}
-            role="tab"
-            aria-selected={activeView === 'releases'}
-          >
-            Release management
-          </button>
-          <button
-            type="button"
-            className={`${styles.viewTabButton} ${activeView === 'transactions' ? styles['viewTabButton--active'] : ''}`.trim()}
-            onClick={() => setActiveView('transactions')}
-            role="tab"
-            aria-selected={activeView === 'transactions'}
-          >
-            Transaction events
-          </button>
-        </div>
+        <nav className={styles.viewMenu} aria-label="Workspace sections">
+          {viewMenuItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`${styles.viewMenuButton} ${activeView === item.id ? styles['viewMenuButton--active'] : ''}`.trim()}
+              onClick={() => setActiveView(item.id)}
+              aria-pressed={activeView === item.id}
+            >
+              <span className={styles.viewMenuIcon}>{item.icon}</span>
+              <span className={styles.viewMenuText}>
+                <span className={styles.viewMenuLabel}>{item.label}</span>
+                <span className={styles.viewMenuDescription}>{item.description}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
 
         {activeView === 'releases' && (
           <>
@@ -388,11 +450,19 @@ export const Dashboard = () => {
                 <button className="btn" onClick={() => exportData()}>
                   <DownloadIcon /> Export
                 </button>
-                <button className="btn btn--filled" onClick={() => setCreateModalOpen(true)}>
+                <button
+                  className="btn btn--filled"
+                  onClick={() => setCreateModalOpen(true)}
+                  disabled={projectOptions.length === 0}
+                  title={projectOptions.length === 0 ? 'Add an organization to create releases.' : undefined}
+                >
                   <PlusIcon /> Add Release
                 </button>
               </div>
             </div>
+            {projectOptions.length === 0 && (
+              <p className={styles.activityLoading}>Add an organization in the Client Directory to start adding releases.</p>
+            )}
 
             <PendingInvitesPanel
               invites={pendingInvites}
@@ -428,22 +498,73 @@ export const Dashboard = () => {
         )}
 
         {activeView === 'transactions' && (
-          <TransactionEventsPanel
-            eventsByClient={transactionEvents}
-            onAddClick={() => setTransactionModalOpen(true)}
-            onView={setViewTransactionEvent}
-            onEdit={setEditTransactionEvent}
-          />
+          <>
+            <TransactionEventSelectorForm eventsByClient={transactionEvents} />
+            <TransactionEventsPanel
+              eventsByClient={transactionEvents}
+              onAddClick={() => setTransactionModalOpen(true)}
+              onView={setViewTransactionEvent}
+              onEdit={setEditTransactionEvent}
+            />
+          </>
+        )}
+
+        {activeView === 'clients' && (
+          <section className={styles.clientsPanel}>
+            <div className={styles.clientsHeader}>
+              <p className={styles.badge}>Client directory</p>
+              <h2>Capture organization metadata once.</h2>
+              <p>Keep por_orgadesc, por_orgacode, and por_active aligned before syncing with releases.</p>
+            </div>
+            {organizationsError && <p className={styles.activityError}>{organizationsError}</p>}
+            {organizationsLoading && <p className={styles.activityLoading}>Loading organizations…</p>}
+            <div className={styles.clientsGrid}>
+              <div className={styles.clientsFormCard}>
+                <ClientForm onSubmit={handleAddClient} />
+              </div>
+              <div className={styles.clientsListCard}>
+                {organizations.length === 0 ? (
+                  <p className={styles.clientEmpty}>No clients added yet. Use the form to register a new organization.</p>
+                ) : (
+                  <ul className={styles.clientList}>
+                    {organizations.map((client) => {
+                      const statusClass =
+                        client.por_active === 'active'
+                          ? styles['clientStatusBadge--active']
+                          : styles['clientStatusBadge--inactive'];
+
+                      return (
+                        <li key={client.id ?? client.por_orgacode} className={styles.clientListItem}>
+                          <div className={styles.clientListHeader}>
+                            <div>
+                              <p className={styles.clientName}>{client.por_orgadesc}</p>
+                              <p className={styles.clientCode}>{client.por_orgacode}</p>
+                            </div>
+                            <span className={`${styles.clientStatusBadge} ${statusClass}`.trim()}>
+                              {client.por_active === 'active' ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <p className={styles.clientMeta}>
+                            Status: {client.por_active === 'active' ? 'Active' : 'Inactive'}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
         )}
       </div>
 
       <Modal title="Add new release" isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)}>
-        <ReleaseForm onSubmit={handleAdd} onCancel={() => setCreateModalOpen(false)} />
+        <ReleaseForm clientOptions={projectOptions} onSubmit={handleAdd} onCancel={() => setCreateModalOpen(false)} />
       </Modal>
 
       <Modal title="Edit release" isOpen={Boolean(editTarget)} onClose={() => setEditTarget(null)}>
         {activeEditData && (
-          <ReleaseForm initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
+          <ReleaseForm clientOptions={projectOptions} initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
         )}
       </Modal>
 

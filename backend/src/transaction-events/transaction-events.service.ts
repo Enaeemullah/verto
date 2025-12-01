@@ -7,6 +7,9 @@ import { CreateTransactionEventDto } from './dto/create-transaction-event.dto';
 import { normalizeKey } from '../shared/normalize-key';
 import { TransactionEventPayload, TransactionEventsResponse } from './transaction-events.types';
 import { UpdateTransactionEventDto } from './dto/update-transaction-event.dto';
+import { Project } from '../projects/project.entity';
+
+const PARENT_ORGANIZATION_SLUG = 'mfsys';
 
 @Injectable()
 export class TransactionEventsService {
@@ -47,34 +50,55 @@ export class TransactionEventsService {
   async createTransactionEvent(userId: string, dto: CreateTransactionEventDto): Promise<TransactionEventsResponse> {
     const normalizedClient = normalizeKey(dto.client);
     const normalizedCode = normalizeKey(dto.code);
-
-    const existing = await this.transactionEventsRepository.findOne({
-      where: { codeKey: normalizedCode },
-    });
-
-    if (existing) {
-      throw new ConflictException('Transaction event already exists');
-    }
-
     const project = await this.projectsService.findAccessibleProjectBySlug(userId, normalizedClient);
 
     if (!project) {
       throw new NotFoundException('Project not found');
     }
 
-    const event = this.transactionEventsRepository.create({
-      projectId: project.id,
-      code: dto.code.trim(),
-      codeKey: normalizedCode,
-      description: dto.description.trim(),
-    });
+    const eventsToPersist: TransactionEvent[] = [];
+    const code = dto.code.trim();
+    const description = dto.description.trim();
 
-    await this.transactionEventsRepository.save(event);
+    await this.ensureEventIsUnique(project.id, normalizedCode);
+    const mainEvent = this.transactionEventsRepository.create({
+      projectId: project.id,
+      code,
+      codeKey: normalizedCode,
+      description,
+    });
+    eventsToPersist.push(mainEvent);
+
+    let parentProject: Project | null = null;
+    let parentEvent: TransactionEvent | null = null;
+    if (normalizedClient !== PARENT_ORGANIZATION_SLUG) {
+      parentProject = await this.projectsService.findAccessibleProjectBySlug(userId, PARENT_ORGANIZATION_SLUG);
+      if (!parentProject) {
+        parentProject = await this.projectsService.ensureProjectForUser(userId, PARENT_ORGANIZATION_SLUG);
+      }
+      await this.ensureEventIsUnique(parentProject.id, normalizedCode);
+      parentEvent = this.transactionEventsRepository.create({
+        projectId: parentProject.id,
+        code,
+        codeKey: normalizedCode,
+        description,
+      });
+      eventsToPersist.push(parentEvent);
+    }
+
+    await this.transactionEventsRepository.save(eventsToPersist);
 
     await this.projectsService.recordActivity(project.id, userId, 'transaction_event_created', {
-      transactionId: event.id,
-      code: event.code,
+      transactionId: mainEvent.id,
+      code: mainEvent.code,
     });
+
+    if (parentProject && parentEvent) {
+      await this.projectsService.recordActivity(parentProject.id, userId, 'transaction_event_created', {
+        transactionId: parentEvent.id,
+        code: parentEvent.code,
+      });
+    }
 
     return this.getEventsForUser(userId);
   }
@@ -147,5 +171,15 @@ export class TransactionEventsService {
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     };
+  }
+
+  private async ensureEventIsUnique(projectId: string, codeKey: string) {
+    const existing = await this.transactionEventsRepository.findOne({
+      where: { projectId, codeKey },
+    });
+
+    if (existing) {
+      throw new ConflictException('Transaction event already exists for this organization.');
+    }
   }
 }
