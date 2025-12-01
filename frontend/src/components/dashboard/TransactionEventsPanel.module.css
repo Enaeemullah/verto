@@ -91,7 +91,7 @@
   border: 1px solid var(--verto-border);
   border-radius: 0.75rem;
   padding: 0.75rem;
-  background: #fafbff;
+  background: #fff;
 }
 
 .eventMain {
@@ -102,9 +102,9 @@
 
 .codeBadge {
   border-radius: 999px;
-  border: 1px solid #cbd5f5;
-  background: #e8edff;
-  color: #1d3fbf;
+  border: 1px solid var(--verto-text);
+  background: var(--verto-highlight);
+  color: var(--verto-black);
   padding: 0.15rem 0.85rem;
   font-weight: 600;
   font-size: 0.9rem;
@@ -116,10 +116,33 @@
   flex: 1;
 }
 
+.eventMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .eventMeta {
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
   color: var(--verto-muted);
+}
+
+.eventActions {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.eventActions button {
+  border: 1px solid var(--verto-text);
+  background: #fff;
+  color: var(--verto-text);
+  padding: 0.25rem 0.85rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .emptyState {

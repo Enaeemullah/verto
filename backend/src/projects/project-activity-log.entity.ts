@@ -6,7 +6,8 @@ export type ProjectActivityAction =
   | 'project_created'
   | 'release_upserted'
   | 'release_deleted'
-  | 'transaction_event_created';
+  | 'transaction_event_created'
+  | 'transaction_event_updated';
 
 @Entity('project_activity_logs')
 export class ProjectActivityLog {

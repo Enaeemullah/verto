@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { TransactionEvent } from './transaction-event.entity';
@@ -6,6 +6,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { CreateTransactionEventDto } from './dto/create-transaction-event.dto';
 import { normalizeKey } from '../shared/normalize-key';
 import { TransactionEventPayload, TransactionEventsResponse } from './transaction-events.types';
+import { UpdateTransactionEventDto } from './dto/update-transaction-event.dto';
 
 @Injectable()
 export class TransactionEventsService {
@@ -71,6 +72,63 @@ export class TransactionEventsService {
     await this.transactionEventsRepository.save(event);
 
     await this.projectsService.recordActivity(project.id, userId, 'transaction_event_created', {
+      transactionId: event.id,
+      code: event.code,
+    });
+
+    return this.getEventsForUser(userId);
+  }
+
+  async updateTransactionEvent(
+    userId: string,
+    eventId: string,
+    dto: UpdateTransactionEventDto,
+  ): Promise<TransactionEventsResponse> {
+    const event = await this.transactionEventsRepository.findOne({
+      where: { id: eventId },
+      relations: { project: true },
+    });
+
+    if (!event || !event.project) {
+      throw new NotFoundException('Transaction event not found');
+    }
+
+    const canEdit = await this.projectsService.isUserInProject(event.projectId, userId);
+    if (!canEdit) {
+      throw new ForbiddenException('You do not have access to this transaction event');
+    }
+
+    const normalizedCode = normalizeKey(dto.code);
+    if (normalizedCode !== event.codeKey) {
+      const conflict = await this.transactionEventsRepository.findOne({
+        where: { codeKey: normalizedCode },
+      });
+
+      if (conflict && conflict.id !== event.id) {
+        throw new ConflictException('Transaction event already exists');
+      }
+
+      event.codeKey = normalizedCode;
+    }
+
+    const normalizedClient = normalizeKey(dto.client);
+    if (normalizedClient !== event.project.slug) {
+      const targetProject = await this.projectsService.findAccessibleProjectBySlug(userId, normalizedClient);
+
+      if (!targetProject) {
+        throw new NotFoundException('Project not found');
+      }
+
+      event.projectId = targetProject.id;
+      event.project = targetProject;
+    }
+
+    event.code = dto.code.trim();
+    event.description = dto.description.trim();
+
+    await this.transactionEventsRepository.save(event);
+
+    await this.projectsService.recordActivity(event.projectId, userId, 'transaction_event_updated', {
       transactionId: event.id,
       code: event.code,
     });

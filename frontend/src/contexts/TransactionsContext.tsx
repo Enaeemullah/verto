@@ -1,11 +1,12 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { TransactionEventsByClient } from '../types/transactions';
-import { createTransactionEventRequest, fetchTransactionEvents } from '../services/api';
+import { TransactionEventInput, TransactionEventsByClient } from '../types/transactions';
+import { createTransactionEventRequest, fetchTransactionEvents, updateTransactionEventRequest } from '../services/api';
 
 interface TransactionsContextValue {
   events: TransactionEventsByClient;
   addEvent: (client: string, code: string, description: string) => Promise<void>;
+  updateEvent: (eventId: string, values: TransactionEventInput) => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -79,13 +80,23 @@ export const TransactionsProvider = ({ children }: TransactionsProviderProps) =>
     [ensureToken],
   );
 
+  const updateEvent = useCallback(
+    async (eventId: string, values: TransactionEventInput) => {
+      const authToken = ensureToken();
+      const data = await updateTransactionEventRequest(authToken, eventId, values);
+      setEvents(data);
+    },
+    [ensureToken],
+  );
+
   const value = useMemo(
     () => ({
       events,
       addEvent,
+      updateEvent,
       reload,
     }),
-    [events, addEvent, reload],
+    [events, addEvent, updateEvent, reload],
   );
 
   return <TransactionsContext.Provider value={value}>{children}</TransactionsContext.Provider>;

@@ -16,7 +16,9 @@ import { ProjectActivityList } from './ProjectActivityList';
 import { PendingInvitesPanel } from './PendingInvitesPanel';
 import { useTransactions } from '../../contexts/TransactionsContext';
 import { TransactionEventsPanel } from './TransactionEventsPanel';
-import { TransactionEventForm } from './TransactionEventForm';
+import { ProjectOption, TransactionEventForm, TransactionEventFormValues } from './TransactionEventForm';
+import { TransactionEvent } from '../../types/transactions';
+import { useToast } from '../../contexts/ToastContext';
 import {
   acceptPendingInviteRequest,
   fetchPendingInvites,
@@ -54,6 +56,9 @@ export const Dashboard = () => {
   const [inviteAction, setInviteAction] = useState<{ id: string; action: 'accept' | 'reject' } | null>(null);
   const [activeView, setActiveView] = useState<'releases' | 'transactions'>('releases');
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [viewTransactionEvent, setViewTransactionEvent] = useState<TransactionEvent | null>(null);
+  const [editTransactionEvent, setEditTransactionEvent] = useState<TransactionEvent | null>(null);
+  const toast = useToast();
   const loadPendingInvites = useCallback(async () => {
     if (!token) {
       setPendingInvites([]);
@@ -79,7 +84,7 @@ export const Dashboard = () => {
   const handleAcceptInvite = useCallback(
     async (inviteId: string) => {
       if (!token) {
-        window.alert('Please sign in to accept invitations.');
+        toast.error('Please sign in to accept invitations.');
         return;
       }
 
@@ -89,20 +94,21 @@ export const Dashboard = () => {
         await acceptPendingInviteRequest(token, inviteId);
         await reloadWorkspace();
         await loadPendingInvites();
+        toast.success('Invitation accepted.');
       } catch (error) {
         console.error(error);
-        window.alert(error instanceof Error ? error.message : 'Unable to accept invite.');
+        toast.error(error instanceof Error ? error.message : 'Unable to accept invite.');
       } finally {
         setInviteAction(null);
       }
     },
-    [token, reloadWorkspace, loadPendingInvites],
+    [token, reloadWorkspace, loadPendingInvites, toast],
   );
 
   const handleRejectInvite = useCallback(
     async (inviteId: string) => {
       if (!token) {
-        window.alert('Please sign in to reject invitations.');
+        toast.error('Please sign in to reject invitations.');
         return;
       }
 
@@ -111,32 +117,47 @@ export const Dashboard = () => {
       try {
         await rejectPendingInviteRequest(token, inviteId);
         await loadPendingInvites();
+        toast.success('Invitation rejected.');
       } catch (error) {
         console.error(error);
-        window.alert(error instanceof Error ? error.message : 'Unable to reject invite.');
+        toast.error(error instanceof Error ? error.message : 'Unable to reject invite.');
       } finally {
         setInviteAction(null);
       }
     },
-    [token, loadPendingInvites],
+    [token, loadPendingInvites, toast],
   );
 
 
   const rows = useMemo(() => sortReleases(flattenReleases(releases)), [releases]);
   const filteredRows = useMemo(() => filterReleases(rows, searchTerm), [rows, searchTerm]);
   const groupedRows = useMemo(() => Array.from(groupByClient(filteredRows).entries()), [filteredRows]);
-  const { events: transactionEvents, addEvent: addTransactionEvent } = useTransactions();
+  const { events: transactionEvents, addEvent: addTransactionEvent, updateEvent: updateTransactionEvent } = useTransactions();
+  const projectOptions = useMemo<ProjectOption[]>(() => {
+    const slugs = new Set<string>();
+    Object.keys(releases).forEach((slug) => slugs.add(slug));
+    Object.keys(activity).forEach((slug) => slugs.add(slug));
+    Object.keys(transactionEvents).forEach((slug) => slugs.add(slug));
+
+    return Array.from(slugs)
+      .map((slug) => ({
+        slug,
+        label: activity[slug]?.name ?? slug,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [releases, activity, transactionEvents]);
 
   const handleAdd = useCallback(
     async (client: string, env: string, release: Release) => {
       try {
         await addRelease(client, env, release);
         setCreateModalOpen(false);
+        toast.success('Release saved.');
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : 'Unable to add release.');
+        toast.error(error instanceof Error ? error.message : 'Unable to add release.');
       }
     },
-    [addRelease]
+    [addRelease, toast],
   );
 
   const handleEdit = useCallback(
@@ -144,11 +165,12 @@ export const Dashboard = () => {
       try {
         await updateRelease(client, env, release);
         setEditTarget(null);
+        toast.success('Release updated.');
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : 'Unable to update release.');
+        toast.error(error instanceof Error ? error.message : 'Unable to update release.');
       }
     },
-    [updateRelease]
+    [updateRelease, toast],
   );
 
   const handleDelete = useCallback(
@@ -160,11 +182,12 @@ export const Dashboard = () => {
 
       try {
         await deleteRelease(client, env);
+        toast.success('Release deleted.');
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : 'Unable to delete release.');
+        toast.error(error instanceof Error ? error.message : 'Unable to delete release.');
       }
     },
-    [deleteRelease]
+    [deleteRelease, toast],
   );
 
   const handleInvite = useCallback(
@@ -175,16 +198,35 @@ export const Dashboard = () => {
   );
 
   const handleAddTransactionEvent = useCallback(
-    async (client: string, code: string, description: string) => {
+    async ({ client, code, description }: TransactionEventFormValues) => {
       try {
         await addTransactionEvent(client, code, description);
         setTransactionModalOpen(false);
+        toast.success('Transaction event added.');
       } catch (error) {
         console.error(error);
-        window.alert(error instanceof Error ? error.message : 'Unable to add transaction event.');
+        toast.error(error instanceof Error ? error.message : 'Unable to add transaction event.');
       }
     },
-    [addTransactionEvent],
+    [addTransactionEvent, toast],
+  );
+
+  const handleUpdateTransactionEvent = useCallback(
+    async ({ client, code, description }: TransactionEventFormValues) => {
+      if (!editTransactionEvent) {
+        return;
+      }
+
+      try {
+        await updateTransactionEvent(editTransactionEvent.id, { client, code, description });
+        setEditTransactionEvent(null);
+        toast.success('Transaction event updated.');
+      } catch (error) {
+        console.error(error);
+        toast.error(error instanceof Error ? error.message : 'Unable to update transaction event.');
+      }
+    },
+    [editTransactionEvent, updateTransactionEvent, toast],
   );
 
   const handleViewActivity = useCallback(
@@ -386,7 +428,12 @@ export const Dashboard = () => {
         )}
 
         {activeView === 'transactions' && (
-          <TransactionEventsPanel eventsByClient={transactionEvents} onAddClick={() => setTransactionModalOpen(true)} />
+          <TransactionEventsPanel
+            eventsByClient={transactionEvents}
+            onAddClick={() => setTransactionModalOpen(true)}
+            onView={setViewTransactionEvent}
+            onEdit={setEditTransactionEvent}
+          />
         )}
       </div>
 
@@ -417,7 +464,53 @@ export const Dashboard = () => {
       <UserSettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <Modal title="Add transaction event" isOpen={isTransactionModalOpen} onClose={() => setTransactionModalOpen(false)}>
-        <TransactionEventForm onSubmit={handleAddTransactionEvent} onCancel={() => setTransactionModalOpen(false)} />
+        <TransactionEventForm
+          projects={projectOptions}
+          onSubmit={handleAddTransactionEvent}
+          onCancel={() => setTransactionModalOpen(false)}
+        />
+      </Modal>
+
+      <Modal
+        title={viewTransactionEvent ? `Transaction ${viewTransactionEvent.code}` : 'Transaction event'}
+        isOpen={Boolean(viewTransactionEvent)}
+        onClose={() => setViewTransactionEvent(null)}
+      >
+        {viewTransactionEvent && (
+          <div className={styles.transactionDetails}>
+            <p>
+              <strong>Project:</strong> {viewTransactionEvent.projectName} ({viewTransactionEvent.client})
+            </p>
+            <p>
+              <strong>Code:</strong> {viewTransactionEvent.code}
+            </p>
+            <p>
+              <strong>Description:</strong> {viewTransactionEvent.description}
+            </p>
+            <p>
+              <strong>Created:</strong> {new Date(viewTransactionEvent.createdAt).toLocaleString()}
+            </p>
+            <p>
+              <strong>Last updated:</strong> {new Date(viewTransactionEvent.updatedAt).toLocaleString()}
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      <Modal title="Edit transaction event" isOpen={Boolean(editTransactionEvent)} onClose={() => setEditTransactionEvent(null)}>
+        {editTransactionEvent && (
+          <TransactionEventForm
+            projects={projectOptions}
+            initialValues={{
+              client: editTransactionEvent.client,
+              code: editTransactionEvent.code,
+              description: editTransactionEvent.description,
+            }}
+            submitLabel="Save changes"
+            onSubmit={handleUpdateTransactionEvent}
+            onCancel={() => setEditTransactionEvent(null)}
+          />
+        )}
       </Modal>
 
       <Modal

@@ -55,9 +55,9 @@
 }
 
 .viewTabButton--active {
-  background: #1d3fbf;
-  color: #fff;
-  border-color: #1d3fbf;
+  background: var(--verto-highlight);
+  color: var(--verto-black);
+  border-color: var(--verto-black);
 }
 
 .badge {
@@ -203,7 +203,23 @@
 
 .activityError {
   margin: 0;
-  color: #c0392b;
+  color: var(--verto-black);
+  background: var(--verto-highlight);
+  padding: 0.75rem 1rem;
+}
+
+.transactionDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.transactionDetails p {
+  margin: 0;
+}
+
+.transactionDetails strong {
+  font-weight: 600;
 }
 
 @media (max-width: 768px) {

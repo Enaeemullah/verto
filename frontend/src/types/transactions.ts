@@ -10,3 +10,9 @@ export interface TransactionEvent {
 }
 
 export type TransactionEventsByClient = Record<string, TransactionEvent[]>;
+
+export interface TransactionEventInput {
+  client: string;
+  code: string;
+  description: string;
+}

@@ -1,15 +1,17 @@
 import styles from './TransactionEventsPanel.module.css';
-import { TransactionEventsByClient } from '../../types/transactions';
+import { TransactionEvent, TransactionEventsByClient } from '../../types/transactions';
 
 interface TransactionEventsPanelProps {
   eventsByClient: TransactionEventsByClient;
   onAddClick: () => void;
+  onView: (event: TransactionEvent) => void;
+  onEdit: (event: TransactionEvent) => void;
 }
 
 const formatTimestamp = (isoString: string) =>
   new Date(isoString).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
-export const TransactionEventsPanel = ({ eventsByClient, onAddClick }: TransactionEventsPanelProps) => {
+export const TransactionEventsPanel = ({ eventsByClient, onAddClick, onView, onEdit }: TransactionEventsPanelProps) => {
   const entries = Object.entries(eventsByClient).sort(([a], [b]) => a.localeCompare(b));
 
   return (
@@ -54,7 +56,17 @@ export const TransactionEventsPanel = ({ eventsByClient, onAddClick }: Transacti
                       <span className={styles.codeBadge}>{event.code}</span>
                       <p className={styles.eventDescription}>{event.description}</p>
                     </div>
-                    <p className={styles.eventMeta}>Created {formatTimestamp(event.createdAt)}</p>
+                    <div className={styles.eventMetaRow}>
+                      <p className={styles.eventMeta}>Created {formatTimestamp(event.createdAt)}</p>
+                      <div className={styles.eventActions}>
+                        <button type="button" onClick={() => onView(event)}>
+                          View
+                        </button>
+                        <button type="button" onClick={() => onEdit(event)}>
+                          Edit
+                        </button>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
