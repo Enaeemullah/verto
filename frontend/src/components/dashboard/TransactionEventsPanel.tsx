@@ -8,7 +8,7 @@ interface TransactionEventsPanelProps {
   onAddClick: () => void;
   onView: (event: TransactionEvent) => void;
   onEdit: (event: TransactionEvent) => void;
-  onGenerateScript: () => void;
+  onGenerateScript: (event: TransactionEvent) => void;
 }
 
 const formatTimestamp = (isoString: string) =>
@@ -63,9 +63,6 @@ export const TransactionEventsPanel = ({
               <ListViewIcon /> List
             </button>
           </div>
-          <button type="button" className="btn" onClick={onGenerateScript}>
-            Generate script
-          </button>
           <button type="button" className="btn btn--filled" onClick={onAddClick}>
             Add transaction event
           </button>
@@ -108,6 +105,9 @@ export const TransactionEventsPanel = ({
                           </button>
                           <button type="button" onClick={() => onEdit(event)}>
                             Edit
+                          </button>
+                          <button type="button" onClick={() => onGenerateScript(event)}>
+                            Generate script
                           </button>
                         </div>
                       </div>
@@ -153,6 +153,9 @@ export const TransactionEventsPanel = ({
                       </button>
                       <button type="button" onClick={() => onEdit(event)}>
                         Edit
+                      </button>
+                      <button type="button" onClick={() => onGenerateScript(event)}>
+                        Generate script
                       </button>
                     </div>
                   </td>

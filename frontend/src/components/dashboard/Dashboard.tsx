@@ -250,9 +250,12 @@ export const Dashboard = () => {
     [addTransactionEvent, toast],
   );
 
-  const handleGenerateScript = useCallback(() => {
-    toast.info('Script generation is coming soon.');
-  }, [toast]);
+  const handleGenerateScript = useCallback(
+    (event: TransactionEvent) => {
+      toast.info(`Script generation for ${event.code} is coming soon.`);
+    },
+    [toast],
+  );
 
   const handleUpdateTransactionEvent = useCallback(
     async ({ client, code, description }: TransactionEventFormValues) => {
