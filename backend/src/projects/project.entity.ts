@@ -28,6 +28,15 @@ export class Project {
   @Column()
   slug: string;
 
+  @Column({ name: 'por_orgadesc', nullable: true })
+  porOrgadesc: string | null;
+
+  @Column({ name: 'por_orgacode', nullable: true })
+  porOrgacode: string | null;
+
+  @Column({ name: 'por_active', default: 'active' })
+  porActive: 'active' | 'inactive';
+
   @Column()
   ownerId: string;
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { normalizeKey } from '../shared/normalize-key';
@@ -6,6 +6,7 @@ import { Project } from './project.entity';
 import { ProjectMember, ProjectRole } from './project-member.entity';
 import { ProjectActivityAction, ProjectActivityLog } from './project-activity-log.entity';
 import { User } from '../users/user.entity';
+import { CreateOrganizationDto } from './dto/create-organization.dto';
 
 const DEFAULT_LOG_LIMIT = 10;
 
@@ -32,6 +33,13 @@ export interface ProjectActivitySummaryDto {
   lastUpdatedAt: string | null;
   lastUpdatedBy: ProjectActivityUserDto | null;
   recentLogs: ProjectActivityLogDto[];
+}
+
+export interface OrganizationDto {
+  id: string;
+  por_orgadesc: string;
+  por_orgacode: string;
+  por_active: 'active' | 'inactive';
 }
 
 @Injectable()
@@ -132,6 +140,50 @@ export class ProjectsService {
     });
 
     return this.membersRepository.save(member);
+  }
+
+  async listOrganizations(userId: string): Promise<OrganizationDto[]> {
+    const ids = await this.getAccessibleProjectIds(userId);
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const projects = await this.projectsRepository.find({
+      where: { id: In(ids) },
+      order: { name: 'ASC' },
+    });
+
+    return projects.map((project) => this.toOrganizationDto(project));
+  }
+
+  async createOrganization(ownerId: string, dto: CreateOrganizationDto): Promise<OrganizationDto> {
+    const slug = normalizeKey(dto.por_orgacode);
+    const existing = await this.projectsRepository.findOne({
+      where: { ownerId, slug },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Organization already exists.');
+    }
+
+    const project = this.projectsRepository.create({
+      ownerId,
+      slug,
+      name: dto.por_orgadesc.trim(),
+      porOrgadesc: dto.por_orgadesc.trim(),
+      porOrgacode: dto.por_orgacode.trim(),
+      porActive: dto.por_active,
+    });
+
+    const saved = await this.projectsRepository.save(project);
+    await this.ensureMembership(saved.id, ownerId, 'owner');
+    await this.recordActivity(saved.id, ownerId, 'project_created', {
+      por_orgadesc: saved.porOrgadesc,
+      por_orgacode: saved.porOrgacode,
+      por_active: saved.porActive,
+    });
+
+    return this.toOrganizationDto(saved);
   }
 
   async isUserInProject(projectId: string, userId: string) {
@@ -303,6 +355,15 @@ export class ProjectsService {
       displayName: displayName ?? null,
       firstName: firstName ?? null,
       lastName: lastName ?? null,
+    };
+  }
+
+  private toOrganizationDto(project: Project): OrganizationDto {
+    return {
+      id: project.id,
+      por_orgadesc: project.porOrgadesc ?? project.name,
+      por_orgacode: project.porOrgacode ?? project.slug,
+      por_active: project.porActive ?? 'active',
     };
   }
 }

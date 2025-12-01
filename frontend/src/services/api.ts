@@ -2,6 +2,7 @@ import { Release, ReleasesData } from '../types/releases';
 import { UserProfile } from '../types/user';
 import { PendingProjectInvite, ProjectActivityMap, ProjectActivitySummary } from '../types/projects';
 import { TransactionEventInput, TransactionEventsByClient } from '../types/transactions';
+import { Organization, OrganizationInput } from '../types/organizations';
 
 const DEFAULT_API_URL = 'http://localhost:3000';
 const baseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? DEFAULT_API_URL;
@@ -227,3 +228,15 @@ export const fetchProjectActivitySummaries = (token: string) =>
 
 export const fetchProjectActivityDetail = (token: string, client: string) =>
   request<ProjectActivitySummary>(`/projects/${encodeURIComponent(client)}/activity`, { method: 'GET' }, token);
+
+export const fetchOrganizations = (token: string) => request<Organization[]>('/organizations', { method: 'GET' }, token);
+
+export const createOrganizationRequest = (token: string, payload: OrganizationInput) =>
+  request<Organization>(
+    '/organizations',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  );

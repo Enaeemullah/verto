@@ -1,17 +1,19 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import styles from './ReleaseForm.module.css';
 import { Release } from '../../types/releases';
 import { normalizeKey } from '../../utils/releases';
+import { ProjectOption } from './TransactionEventForm';
 
 interface ReleaseFormProps {
   initialData?: { client: string; env: string; release: Release };
+  clientOptions?: ProjectOption[];
   onSubmit: (client: string, env: string, release: Release) => Promise<void> | void;
   onCancel: () => void;
 }
 
 const today = () => new Date().toISOString().split('T')[0];
 
-export const ReleaseForm = ({ initialData, onSubmit, onCancel }: ReleaseFormProps) => {
+export const ReleaseForm = ({ initialData, clientOptions, onSubmit, onCancel }: ReleaseFormProps) => {
   const [client, setClient] = useState(initialData?.client ?? '');
   const [env, setEnv] = useState(initialData?.env ?? '');
   const [branch, setBranch] = useState(initialData?.release.branch ?? '');
@@ -20,6 +22,15 @@ export const ReleaseForm = ({ initialData, onSubmit, onCancel }: ReleaseFormProp
   const [date, setDate] = useState(initialData?.release.date ?? today());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [commitMessage, setCommitMessage] = useState(initialData?.release.commitMessage ?? '');
+  const hasClientOptions = Boolean(clientOptions?.length);
+
+  useEffect(() => {
+    if (initialData || !hasClientOptions || client) {
+      return;
+    }
+
+    setClient(clientOptions?.[0]?.slug ?? '');
+  }, [initialData, hasClientOptions, clientOptions, client]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,21 +55,52 @@ export const ReleaseForm = ({ initialData, onSubmit, onCancel }: ReleaseFormProp
   };
 
   const disableIdentityFields = Boolean(initialData);
+  const shouldShowClientSelect = !disableIdentityFields && hasClientOptions;
+  const shouldShowClientPlaceholder = !disableIdentityFields && !hasClientOptions;
+  const isSubmitDisabled =
+    isSubmitting ||
+    !env ||
+    !branch ||
+    !version ||
+    (!disableIdentityFields && (!client || shouldShowClientPlaceholder));
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <div>
         <label className={styles.label} htmlFor="client">
-          Client name
+          Organization
         </label>
-        <input
-          id="client"
-          type="text"
-          value={client}
-          onChange={(event) => setClient(event.target.value)}
-          placeholder="acme"
-          disabled={disableIdentityFields}
-        />
+        {shouldShowClientSelect && (
+          <>
+            <select id="client" value={client} onChange={(event) => setClient(event.target.value)}>
+              <option value="">Select an organization</option>
+              {clientOptions?.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className={styles.helperText}>Organizations come from the Client Directory.</p>
+          </>
+        )}
+        {disableIdentityFields && (
+          <input
+            id="client"
+            type="text"
+            value={client}
+            onChange={(event) => setClient(event.target.value)}
+            placeholder="acme"
+            disabled
+          />
+        )}
+        {shouldShowClientPlaceholder && (
+          <>
+            <select id="client" disabled>
+              <option>Add an organization to get started</option>
+            </select>
+            <p className={styles.helperText}>Create an organization in the Client Directory first.</p>
+          </>
+        )}
       </div>
 
       <div>
@@ -138,7 +180,7 @@ export const ReleaseForm = ({ initialData, onSubmit, onCancel }: ReleaseFormProp
       </div>
 
       <div className={styles.actions}>
-        <button type="submit" className="btn btn--filled" disabled={isSubmitting}>
+        <button type="submit" className="btn btn--filled" disabled={isSubmitDisabled}>
           {initialData ? 'Update Release' : 'Add Release'}
         </button>
         <button type="button" className="btn btn--ghost" onClick={onCancel}>

@@ -21,6 +21,7 @@ import { TransactionEvent } from '../../types/transactions';
 import { useToast } from '../../contexts/ToastContext';
 import { ClientForm, ClientFormValues } from './ClientForm';
 import { TransactionEventSelectorForm } from './TransactionEventSelectorForm';
+import { useOrganizations } from '../../contexts/OrganizationsContext';
 import {
   acceptPendingInviteRequest,
   fetchPendingInvites,
@@ -28,19 +29,6 @@ import {
 } from '../../services/api';
 
 type DashboardView = 'releases' | 'transactions' | 'clients';
-
-interface ClientRecord extends ClientFormValues {
-  id: string;
-  createdAt: string;
-}
-
-const generateClientId = () => {
-  if (typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto) {
-    return globalThis.crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
 
 export const Dashboard = () => {
   const {
@@ -55,6 +43,7 @@ export const Dashboard = () => {
     reloadWorkspace,
   } = useReleases();
   const { currentUser, logout, token } = useAuth();
+  const { organizations, isLoading: organizationsLoading, error: organizationsError, createOrganization } = useOrganizations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -75,7 +64,6 @@ export const Dashboard = () => {
   const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
   const [viewTransactionEvent, setViewTransactionEvent] = useState<TransactionEvent | null>(null);
   const [editTransactionEvent, setEditTransactionEvent] = useState<TransactionEvent | null>(null);
-  const [clientRecords, setClientRecords] = useState<ClientRecord[]>([]);
   const toast = useToast();
   const loadPendingInvites = useCallback(async () => {
     if (!token) {
@@ -166,13 +154,13 @@ export const Dashboard = () => {
       }
     };
 
+    organizations.forEach((org) => registerSlug(org.por_orgacode, org.por_orgadesc));
     Object.keys(releases).forEach((slug) => registerSlug(slug));
     Object.entries(activity).forEach(([slug, summary]) => registerSlug(slug, summary?.name ?? slug));
     Object.entries(transactionEvents).forEach(([slug, events]) => {
       const displayName = events[0]?.projectName ?? labels.get(slug) ?? slug;
       registerSlug(slug, displayName);
     });
-    clientRecords.forEach((record) => registerSlug(record.por_orgacode, record.por_orgadesc));
 
     return Array.from(slugs)
       .map((slug) => ({
@@ -180,7 +168,7 @@ export const Dashboard = () => {
         label: labels.get(slug) ?? slug,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [releases, activity, transactionEvents, clientRecords]);
+  }, [organizations, releases, activity, transactionEvents]);
 
   const viewMenuItems = useMemo(
     () => [
@@ -257,17 +245,21 @@ export const Dashboard = () => {
   );
 
   const handleAddClient = useCallback(
-    (values: ClientFormValues) => {
-      const record: ClientRecord = {
-        ...values,
-        id: generateClientId(),
-        createdAt: new Date().toISOString(),
-      };
-
-      setClientRecords((previous) => [...previous, record]);
-      toast.success('Client saved.');
+    async (values: ClientFormValues) => {
+      try {
+        await createOrganization({
+          por_orgadesc: values.por_orgadesc,
+          por_orgacode: values.por_orgacode,
+          por_active: values.por_active,
+        });
+        toast.success('Client saved.');
+      } catch (error) {
+        console.error(error);
+        toast.error(error instanceof Error ? error.message : 'Unable to save organization.');
+        throw error;
+      }
     },
-    [toast]
+    [createOrganization, toast],
   );
 
   const handleAddTransactionEvent = useCallback(
@@ -458,11 +450,19 @@ export const Dashboard = () => {
                 <button className="btn" onClick={() => exportData()}>
                   <DownloadIcon /> Export
                 </button>
-                <button className="btn btn--filled" onClick={() => setCreateModalOpen(true)}>
+                <button
+                  className="btn btn--filled"
+                  onClick={() => setCreateModalOpen(true)}
+                  disabled={projectOptions.length === 0}
+                  title={projectOptions.length === 0 ? 'Add an organization to create releases.' : undefined}
+                >
                   <PlusIcon /> Add Release
                 </button>
               </div>
             </div>
+            {projectOptions.length === 0 && (
+              <p className={styles.activityLoading}>Add an organization in the Client Directory to start adding releases.</p>
+            )}
 
             <PendingInvitesPanel
               invites={pendingInvites}
@@ -516,23 +516,25 @@ export const Dashboard = () => {
               <h2>Capture organization metadata once.</h2>
               <p>Keep por_orgadesc, por_orgacode, and por_active aligned before syncing with releases.</p>
             </div>
+            {organizationsError && <p className={styles.activityError}>{organizationsError}</p>}
+            {organizationsLoading && <p className={styles.activityLoading}>Loading organizations…</p>}
             <div className={styles.clientsGrid}>
               <div className={styles.clientsFormCard}>
                 <ClientForm onSubmit={handleAddClient} />
               </div>
               <div className={styles.clientsListCard}>
-                {clientRecords.length === 0 ? (
+                {organizations.length === 0 ? (
                   <p className={styles.clientEmpty}>No clients added yet. Use the form to register a new organization.</p>
                 ) : (
                   <ul className={styles.clientList}>
-                    {clientRecords.map((client) => {
+                    {organizations.map((client) => {
                       const statusClass =
                         client.por_active === 'active'
                           ? styles['clientStatusBadge--active']
                           : styles['clientStatusBadge--inactive'];
 
                       return (
-                        <li key={client.id} className={styles.clientListItem}>
+                        <li key={client.id ?? client.por_orgacode} className={styles.clientListItem}>
                           <div className={styles.clientListHeader}>
                             <div>
                               <p className={styles.clientName}>{client.por_orgadesc}</p>
@@ -542,7 +544,9 @@ export const Dashboard = () => {
                               {client.por_active === 'active' ? 'Active' : 'Inactive'}
                             </span>
                           </div>
-                          <p className={styles.clientMeta}>Added {new Date(client.createdAt).toLocaleString()}</p>
+                          <p className={styles.clientMeta}>
+                            Status: {client.por_active === 'active' ? 'Active' : 'Inactive'}
+                          </p>
                         </li>
                       );
                     })}
@@ -555,12 +559,12 @@ export const Dashboard = () => {
       </div>
 
       <Modal title="Add new release" isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)}>
-        <ReleaseForm onSubmit={handleAdd} onCancel={() => setCreateModalOpen(false)} />
+        <ReleaseForm clientOptions={projectOptions} onSubmit={handleAdd} onCancel={() => setCreateModalOpen(false)} />
       </Modal>
 
       <Modal title="Edit release" isOpen={Boolean(editTarget)} onClose={() => setEditTarget(null)}>
         {activeEditData && (
-          <ReleaseForm initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
+          <ReleaseForm clientOptions={projectOptions} initialData={activeEditData} onSubmit={handleEdit} onCancel={() => setEditTarget(null)} />
         )}
       </Modal>
 

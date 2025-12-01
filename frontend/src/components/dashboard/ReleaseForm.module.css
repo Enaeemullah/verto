@@ -20,6 +20,16 @@
   margin-bottom: 0.35rem;
 }
 
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  border-radius: 0.65rem;
+  border: 1px solid var(--verto-border);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+}
+
 .actions {
   display: flex;
   gap: 0.5rem;

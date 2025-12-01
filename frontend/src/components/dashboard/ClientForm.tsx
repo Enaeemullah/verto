@@ -53,6 +53,9 @@ export const ClientForm = ({ initialValues, submitLabel, onSubmit, onCancel }: C
       if (!initialValues) {
         setValues(defaultValues);
       }
+    } catch (error) {
+      // Let parent handlers surface the error without resetting the form
+      return;
     } finally {
       setIsSubmitting(false);
     }
