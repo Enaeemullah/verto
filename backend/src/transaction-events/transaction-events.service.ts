@@ -74,7 +74,7 @@ export class TransactionEventsService {
     if (normalizedClient !== PARENT_ORGANIZATION_SLUG) {
       parentProject = await this.projectsService.findAccessibleProjectBySlug(userId, PARENT_ORGANIZATION_SLUG);
       if (!parentProject) {
-        throw new NotFoundException('Parent organization (MFSYS) not found');
+        parentProject = await this.projectsService.ensureProjectForUser(userId, PARENT_ORGANIZATION_SLUG);
       }
       await this.ensureEventIsUnique(parentProject.id, normalizedCode);
       parentEvent = this.transactionEventsRepository.create({
