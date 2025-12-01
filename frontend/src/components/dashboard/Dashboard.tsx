@@ -553,7 +553,7 @@ export const Dashboard = () => {
               <strong>Project:</strong> {viewTransactionEvent.projectName} ({viewTransactionEvent.client})
             </p>
             <p>
-              <strong>PET code:</strong> {viewTransactionEvent.petEventCode}
+              <strong>Event Code:</strong> {viewTransactionEvent.petEventCode}
             </p>
             <p>
               <strong>Description:</strong> {viewTransactionEvent.petEventDesc}

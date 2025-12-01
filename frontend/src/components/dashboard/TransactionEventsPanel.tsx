@@ -125,7 +125,7 @@ export const TransactionEventsPanel = ({
           <table className={styles.listTable}>
             <thead>
               <tr>
-                <th>PET code</th>
+                <th>Event Code</th>
                 <th>Description</th>
                 <th>Project</th>
                 <th>Last updated</th>
